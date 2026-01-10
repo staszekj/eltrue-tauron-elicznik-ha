@@ -1,0 +1,65 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "[%key:common::config_flow::abort::already_configured_account%]"
+    },
+    "error": {
+      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
+      "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
+      "unknown": "[%key:common::config_flow::error::unknown%]"
+    },
+    "step": {
+      "user": {
+        "data": {
+          "billing_period_end": "Billing period end date",
+          "password": "[%key:common::config_flow::data::password%]",
+          "prev_energia_oddana": "Previous period exported energy",
+          "prev_energia_pobrana": "Previous period consumed energy",
+          "username": "[%key:common::config_flow::data::username%]"
+        },
+        "data_description": {
+          "billing_period_end": "The end date of your current billing period (YYYY-MM-DD) for net-metering calculations.",
+          "password": "Your Tauron eLicznik account password.",
+          "prev_energia_oddana": "Meter reading for exported energy (kWh) at the start of the billing period.",
+          "prev_energia_pobrana": "Meter reading for consumed energy (kWh) at the start of the billing period.",
+          "username": "Your Tauron eLicznik account email address."
+        },
+        "description": "Enter your Tauron eLicznik credentials and billing period information.",
+        "title": "Connect to Tauron eLicznik"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "days_left": {
+        "name": "Days until billing"
+      },
+      "energia_oddana": {
+        "name": "Exported energy"
+      },
+      "energia_pobrana": {
+        "name": "Consumed energy"
+      },
+      "kwh_left": {
+        "name": "Energy balance"
+      },
+      "kwh_left_per_day": {
+        "name": "Daily energy budget"
+      },
+      "kwh_left_per_month": {
+        "name": "Monthly energy budget"
+      },
+      "last_reading_date": {
+        "name": "Last reading date"
+      }
+    }
+  },
+  "exceptions": {
+    "api_error": {
+      "message": "Error communicating with Tauron eLicznik API: {error}"
+    },
+    "auth_error": {
+      "message": "Authentication failed. Please check your credentials."
+    }
+  }
+}
