@@ -12,6 +12,7 @@ Home Assistant integration for **Tauron eLicznik** - Polish energy meter reading
 - ⚡ **Net-metering balance** - kWh left to use (80% ratio in Poland)
 - 📅 **Days until billing period ends**
 - 📈 **Daily/Monthly usage projections**
+- 🔄 **Manual refresh button** - Force data update on demand
 
 ## Installation
 
@@ -43,13 +44,28 @@ You'll need:
 
 | Sensor | Description | Unit |
 |--------|-------------|------|
-| `sensor.tauron_elicznik_energia_pobrana` | Total energy consumed | kWh |
-| `sensor.tauron_elicznik_energia_oddana` | Total energy exported | kWh |
-| `sensor.tauron_elicznik_kwh_left` | Net-metering balance remaining | kWh |
-| `sensor.tauron_elicznik_kwh_left_per_day` | Required daily usage to zero balance | kWh |
-| `sensor.tauron_elicznik_kwh_left_per_month` | Projected monthly usage needed | kWh |
-| `sensor.tauron_elicznik_days_left` | Days until billing period ends | days |
+| `sensor.tauron_elicznik_consumed_energy` | Total energy consumed | kWh |
+| `sensor.tauron_elicznik_exported_energy` | Total energy exported | kWh |
+| `sensor.tauron_elicznik_energy_balance` | Net-metering balance remaining | kWh |
+| `sensor.tauron_elicznik_daily_energy_budget` | Required daily usage to zero balance | kWh |
+| `sensor.tauron_elicznik_monthly_energy_budget` | Projected monthly usage needed | kWh |
+| `sensor.tauron_elicznik_days_until_billing` | Days until billing period ends | days |
 | `sensor.tauron_elicznik_last_reading_date` | Date of last meter reading | date |
+
+## Button
+
+| Button | Description |
+|--------|-------------|
+| `button.tauron_elicznik_refresh_data` | Manually trigger data refresh from Tauron API |
+
+## Polling Interval
+
+By default, data is polled every **12 hours**. Since Tauron meter readings are typically updated once per day (after midnight for the previous day), more frequent polling would just return the same data.
+
+You can manually trigger a refresh anytime:
+- Press the "Refresh data" button in the UI
+- Add the button to your dashboard for easy access
+- Use the `button.press` service in automations
 
 ## Net-Metering Calculation
 

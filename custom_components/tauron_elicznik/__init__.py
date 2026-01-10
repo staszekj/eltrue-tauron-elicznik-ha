@@ -9,7 +9,7 @@ from homeassistant.core import HomeAssistant
 from .const import DOMAIN as DOMAIN
 from .coordinator import TauronElicznikCoordinator
 
-PLATFORMS: list[Platform] = [Platform.SENSOR]
+PLATFORMS: list[Platform] = [Platform.BUTTON, Platform.SENSOR]
 
 type TauronElicznikConfigEntry = ConfigEntry[TauronElicznikCoordinator]
 

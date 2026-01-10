@@ -30,6 +30,11 @@
     }
   },
   "entity": {
+    "button": {
+      "refresh": {
+        "name": "Refresh data"
+      }
+    },
     "sensor": {
       "days_left": {
         "name": "Days until billing"
