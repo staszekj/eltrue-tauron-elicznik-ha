@@ -13,6 +13,7 @@ Home Assistant integration for **Tauron eLicznik** - Polish energy meter reading
 - 📅 **Days until billing period ends**
 - 📈 **Daily/Monthly usage projections**
 - 🔄 **Manual refresh button** - Force data update on demand
+- 🕐 **Full timestamp** of last meter reading and last API fetch
 
 ## Installation
 
@@ -34,23 +35,30 @@ Home Assistant integration for **Tauron eLicznik** - Polish energy meter reading
 
 ## Configuration
 
-You'll need:
-- **Username**: Your Tauron eLicznik email (e.g., `user@example.com`)
-- **Password**: Your Tauron eLicznik password
-- **Billing period end**: Last day of your billing period (for net-metering calculations)
-- **Previous readings**: Optional - starting values for the billing period
+You only need three fields to set up the integration:
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| **Username** | Your Tauron eLicznik email | `user@example.com` |
+| **Password** | Your Tauron eLicznik password | |
+| **Billing period start** | First day of your billing period | `2026-03-01` |
+
+During setup, the integration automatically fetches your meter readings as of the billing period start date from the Tauron API — no need to enter them manually. The billing period end date is also calculated automatically (start + 1 year − 1 day).
 
 ## Sensors
 
-| Sensor | Description | Unit |
-|--------|-------------|------|
-| `sensor.tauron_elicznik_consumed_energy` | Total energy consumed | kWh |
-| `sensor.tauron_elicznik_exported_energy` | Total energy exported | kWh |
-| `sensor.tauron_elicznik_energy_balance` | Net-metering balance remaining | kWh |
-| `sensor.tauron_elicznik_daily_energy_budget` | Required daily usage to zero balance | kWh |
-| `sensor.tauron_elicznik_monthly_energy_budget` | Projected monthly usage needed | kWh |
-| `sensor.tauron_elicznik_days_until_billing` | Days until billing period ends | days |
-| `sensor.tauron_elicznik_last_reading_date` | Date of last meter reading | date |
+| Sensor | Description | Unit | Device Class |
+|--------|-------------|------|--------------|
+| `sensor.tauron_elicznik_consumed_energy` | Total energy consumed (lifetime counter) | kWh | energy |
+| `sensor.tauron_elicznik_exported_energy` | Total energy exported (lifetime counter) | kWh | energy |
+| `sensor.tauron_elicznik_consumed_energy_at_billing_start` | Consumed energy at start of billing period | kWh | energy |
+| `sensor.tauron_elicznik_exported_energy_at_billing_start` | Exported energy at start of billing period | kWh | energy |
+| `sensor.tauron_elicznik_energy_balance` | Net-metering balance remaining | kWh | energy |
+| `sensor.tauron_elicznik_daily_energy_budget` | Required daily usage to zero balance | kWh | energy |
+| `sensor.tauron_elicznik_monthly_energy_budget` | Projected monthly usage needed | kWh | energy |
+| `sensor.tauron_elicznik_days_until_billing` | Days until billing period ends | days | — |
+| `sensor.tauron_elicznik_last_reading_date` | Timestamp of last meter reading from Tauron | — | timestamp |
+| `sensor.tauron_elicznik_last_data_fetch` | Timestamp of last successful API call | — | timestamp |
 
 ## Button
 
@@ -75,7 +83,14 @@ In Poland, prosumers can use 80% of the energy they export to the grid. This int
 kWh_left = (energia_oddana_increment × 0.8) - energia_pobrana_increment
 ```
 
-Where increments are calculated from the start of your billing period.
+Where increments are calculated from the start of your billing period:
+
+```
+energia_oddana_increment = exported_energy - exported_energy_at_billing_start
+energia_pobrana_increment = consumed_energy - consumed_energy_at_billing_start
+```
+
+The `_at_billing_start` values are fetched automatically during integration setup.
 
 ## Requirements
 
@@ -87,6 +102,7 @@ Where increments are calculated from the start of your billing period.
 - **Cannot connect**: Verify your credentials at https://elicznik.tauron-dystrybucja.pl
 - **No data**: Meter readings are typically available with 1-day delay
 - **Invalid auth**: Make sure you're using your email address, not username
+- **Wrong balance**: Check that your billing period start date is correct. The integration fetches meter readings for that exact date automatically
 
 ## License
 
