@@ -11,7 +11,7 @@ URL_API: Final = "https://elicznik.tauron-dystrybucja.pl/odczyty/api"
 URL_LOGOUT: Final = "https://elicznik.tauron-dystrybucja.pl/applogout"
 
 # Config keys
-CONF_BILLING_PERIOD_END: Final = "billing_period_end"
+CONF_BILLING_PERIOD_START: Final = "billing_period_start"
 CONF_PREV_ENERGIA_POBRANA: Final = "prev_energia_pobrana"
 CONF_PREV_ENERGIA_ODDANA: Final = "prev_energia_oddana"
 

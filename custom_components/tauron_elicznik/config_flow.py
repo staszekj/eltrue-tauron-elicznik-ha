@@ -14,7 +14,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import TauronApiClient, TauronApiError, TauronAuthError
 from .const import (
-    CONF_BILLING_PERIOD_END,
+    CONF_BILLING_PERIOD_START,
     CONF_PREV_ENERGIA_ODDANA,
     CONF_PREV_ENERGIA_POBRANA,
     DOMAIN,
@@ -23,24 +23,18 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
-def _get_default_billing_end() -> str:
-    """Get default billing period end (end of current month)."""
+def _get_default_billing_start() -> str:
+    """Get default billing period start (March 1 of current or previous year)."""
     today = datetime.now()
-    if today.month == 12:
-        next_month = today.replace(year=today.year + 1, month=1, day=1)
-    else:
-        next_month = today.replace(month=today.month + 1, day=1)
-    last_day = (next_month - datetime.resolution).day
-    return today.replace(day=last_day).strftime("%Y-%m-%d")
+    year = today.year if today.month >= 3 else today.year - 1
+    return f"{year}-03-01"
 
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_USERNAME): str,
         vol.Required(CONF_PASSWORD): str,
-        vol.Required(CONF_BILLING_PERIOD_END, default=_get_default_billing_end()): str,
-        vol.Required(CONF_PREV_ENERGIA_POBRANA, default=0): vol.Coerce(float),
-        vol.Required(CONF_PREV_ENERGIA_ODDANA, default=0): vol.Coerce(float),
+        vol.Required(CONF_BILLING_PERIOD_START, default=_get_default_billing_start()): str,
     }
 )
 
@@ -58,9 +52,14 @@ class TauronElicznikConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
+            billing_start = None
+            energy_at_start = None
+
             # Validate date format
             try:
-                datetime.strptime(user_input[CONF_BILLING_PERIOD_END], "%Y-%m-%d")
+                billing_start = datetime.strptime(
+                    user_input[CONF_BILLING_PERIOD_START], "%Y-%m-%d"
+                ).date()
             except ValueError:
                 errors["base"] = "invalid_date"
 
@@ -69,7 +68,7 @@ class TauronElicznikConfigFlow(ConfigFlow, domain=DOMAIN):
                 await self.async_set_unique_id(user_input[CONF_USERNAME].lower())
                 self._abort_if_unique_id_configured()
 
-                # Test connection
+                # Authenticate and fetch initial readings for billing period start
                 try:
                     session = async_get_clientsession(self.hass)
                     client = TauronApiClient(
@@ -77,7 +76,9 @@ class TauronElicznikConfigFlow(ConfigFlow, domain=DOMAIN):
                         username=user_input[CONF_USERNAME],
                         password=user_input[CONF_PASSWORD],
                     )
-                    await client.test_connection()
+                    await client.authenticate()
+                    energy_at_start = await client.fetch_energy_data(billing_start)
+                    await client.logout()
                 except TauronAuthError:
                     errors["base"] = "invalid_auth"
                 except TauronApiError:
@@ -89,7 +90,13 @@ class TauronElicznikConfigFlow(ConfigFlow, domain=DOMAIN):
             if not errors:
                 return self.async_create_entry(
                     title=f"Tauron ({user_input[CONF_USERNAME]})",
-                    data=user_input,
+                    data={
+                        CONF_USERNAME: user_input[CONF_USERNAME],
+                        CONF_PASSWORD: user_input[CONF_PASSWORD],
+                        CONF_BILLING_PERIOD_START: user_input[CONF_BILLING_PERIOD_START],
+                        CONF_PREV_ENERGIA_POBRANA: energy_at_start.energia_pobrana,
+                        CONF_PREV_ENERGIA_ODDANA: energy_at_start.energia_oddana,
+                    },
                 )
 
         return self.async_show_form(

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -65,7 +65,7 @@ SENSOR_DESCRIPTIONS: tuple[TauronSensorEntityDescription, ...] = (
     TauronSensorEntityDescription(
         key="last_reading_date",
         translation_key="last_reading_date",
-        device_class=SensorDeviceClass.DATE,
+        device_class=SensorDeviceClass.TIMESTAMP,
         value_fn=lambda data: data.reading_date,
     ),
     TauronSensorEntityDescription(
@@ -83,6 +83,28 @@ SENSOR_DESCRIPTIONS: tuple[TauronSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         state_class=SensorStateClass.TOTAL_INCREASING,
         value_fn=lambda data: data.energia_oddana,
+    ),
+    TauronSensorEntityDescription(
+        key="energia_pobrana_start",
+        translation_key="energia_pobrana_start",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=lambda data: data.energia_pobrana_start,
+    ),
+    TauronSensorEntityDescription(
+        key="energia_oddana_start",
+        translation_key="energia_oddana_start",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=lambda data: data.energia_oddana_start,
+    ),
+    TauronSensorEntityDescription(
+        key="last_fetch_time",
+        translation_key="last_fetch_time",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=lambda data: data.last_fetch_time,
     ),
 )
 
@@ -126,7 +148,7 @@ class TauronSensor(CoordinatorEntity[TauronElicznikCoordinator], SensorEntity):
         )
 
     @property
-    def native_value(self) -> float | int | date | None:
+    def native_value(self) -> float | int | date | datetime | None:
         """Return the state of the sensor."""
         if self.coordinator.data is None:
             return None

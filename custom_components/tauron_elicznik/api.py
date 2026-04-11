@@ -28,7 +28,7 @@ class TauronEnergyData:
 
     energia_pobrana: float
     energia_oddana: float
-    reading_date: date
+    reading_date: datetime
     success: bool
 
 
@@ -50,6 +50,13 @@ class TauronApiClient:
     async def authenticate(self) -> bool:
         """Login to Tauron eLicznik and obtain session cookies."""
         _LOGGER.debug("Authenticating with Tauron eLicznik")
+
+        # GET login page first to obtain PHPSESSID session cookie
+        try:
+            async with self._session.get(URL_LOGIN, allow_redirects=True):
+                pass
+        except Exception as err:
+            raise TauronApiError(f"Failed to reach login page: {err}") from err
 
         login_data = {
             "username": self._username,
@@ -179,9 +186,8 @@ class TauronApiClient:
             latest_record = data["data"][-1]  # Take last record (most recent)
             counter_value = float(latest_record["C"])
 
-            # Parse the date from the response
-            date_str = latest_record["Date"].split()[0]  # "09.01.2026 23:59:59" -> "09.01.2026"
-            reading_date = datetime.strptime(date_str, "%d.%m.%Y").date()
+            # Parse the full datetime from the response (e.g. "09.01.2026 23:59:59")
+            reading_date = datetime.strptime(latest_record["Date"], "%d.%m.%Y %H:%M:%S")
         except (KeyError, IndexError, TypeError, ValueError) as err:
             raise TauronApiError(f"Invalid API response format: {err}") from err
 

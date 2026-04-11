@@ -1,20 +1,20 @@
 {
   "config": {
     "abort": {
-      "already_configured": "[%key:common::config_flow::abort::already_configured_account%]"
+      "already_configured": "Account is already configured"
     },
     "error": {
-      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
-      "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication",
       "invalid_date": "Invalid date format, expected YYYY-MM-DD.",
-      "unknown": "[%key:common::config_flow::error::unknown%]"
+      "unknown": "Unexpected error"
     },
     "step": {
       "user": {
         "data": {
           "billing_period_start": "Billing period start date",
-          "password": "[%key:common::config_flow::data::password%]",
-          "username": "[%key:common::config_flow::data::username%]"
+          "password": "Password",
+          "username": "Email"
         },
         "data_description": {
           "billing_period_start": "The start date of your current billing period (YYYY-MM-DD). Initial meter readings will be fetched automatically from eLicznik.",
@@ -63,14 +63,6 @@
       "last_fetch_time": {
         "name": "Last data fetch"
       }
-    }
-  },
-  "exceptions": {
-    "api_error": {
-      "message": "Error communicating with Tauron eLicznik API: {error}"
-    },
-    "auth_error": {
-      "message": "Authentication failed. Please check your credentials."
     }
   }
 }

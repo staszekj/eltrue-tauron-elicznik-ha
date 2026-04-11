@@ -10,10 +10,11 @@ from typing import TYPE_CHECKING
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .api import TauronApiClient, TauronApiError, TauronEnergyData
 from .const import (
-    CONF_BILLING_PERIOD_END,
+    CONF_BILLING_PERIOD_START,
     CONF_PREV_ENERGIA_ODDANA,
     CONF_PREV_ENERGIA_POBRANA,
     DEFAULT_SCAN_INTERVAL_HOURS,
@@ -34,7 +35,14 @@ class TauronCalculatedData:
     # Raw meter readings
     energia_pobrana: float
     energia_oddana: float
-    reading_date: date
+    reading_date: datetime
+
+    # Billing period start readings (reference values fetched at setup)
+    energia_pobrana_start: float
+    energia_oddana_start: float
+
+    # Timestamp of last successful data fetch from eLicznik
+    last_fetch_time: datetime
 
     # Increments since billing period start
     energia_pobrana_increment: float
@@ -73,15 +81,20 @@ class TauronElicznikCoordinator(DataUpdateCoordinator[TauronCalculatedData]):
             password=config_entry.data["password"],
         )
 
-        # Billing period configuration
-        self._billing_period_end = datetime.strptime(
-            config_entry.data[CONF_BILLING_PERIOD_END], "%Y-%m-%d"
+        # Billing period configuration: calculate end from start (1 year - 1 day)
+        billing_start = datetime.strptime(
+            config_entry.data[CONF_BILLING_PERIOD_START], "%Y-%m-%d"
         ).date()
+        self._billing_period_end = (
+            date(billing_start.year + 1, billing_start.month, billing_start.day)
+            - timedelta(days=1)
+        )
         self._prev_energia_pobrana = float(config_entry.data[CONF_PREV_ENERGIA_POBRANA])
         self._prev_energia_oddana = float(config_entry.data[CONF_PREV_ENERGIA_ODDANA])
 
     async def _async_update_data(self) -> TauronCalculatedData:
         """Fetch data from Tauron API and calculate net-metering values."""
+        fetch_time = dt_util.now()
         try:
             await self._client.authenticate()
             energy_data = await self._client.fetch_energy_data()
@@ -90,9 +103,9 @@ class TauronElicznikCoordinator(DataUpdateCoordinator[TauronCalculatedData]):
         finally:
             await self._client.logout()
 
-        return self._calculate_data(energy_data)
+        return self._calculate_data(energy_data, fetch_time)
 
-    def _calculate_data(self, energy_data: TauronEnergyData) -> TauronCalculatedData:
+    def _calculate_data(self, energy_data: TauronEnergyData, fetch_time: datetime) -> TauronCalculatedData:
         """Calculate net-metering values from raw energy data."""
         # Calculate increments since billing period start
         en_pob_increment = energy_data.energia_pobrana - self._prev_energia_pobrana
@@ -116,7 +129,10 @@ class TauronElicznikCoordinator(DataUpdateCoordinator[TauronCalculatedData]):
         return TauronCalculatedData(
             energia_pobrana=energy_data.energia_pobrana,
             energia_oddana=energy_data.energia_oddana,
-            reading_date=energy_data.reading_date,
+            reading_date=dt_util.as_local(energy_data.reading_date),
+            energia_pobrana_start=self._prev_energia_pobrana,
+            energia_oddana_start=self._prev_energia_oddana,
+            last_fetch_time=fetch_time,
             energia_pobrana_increment=en_pob_increment,
             energia_oddana_increment=en_odd_increment,
             kwh_left=round(kwh_left, 2),
