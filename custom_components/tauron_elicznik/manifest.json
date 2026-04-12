@@ -4,6 +4,7 @@
   "codeowners": ["@staszekj"],
   "config_flow": true,
   "documentation": "https://github.com/staszekj/tauron-elicznik-ha",
+  "issue_tracker": "https://github.com/staszekj/tauron-elicznik-ha/issues",
   "integration_type": "service",
   "iot_class": "cloud_polling",
   "requirements": ["aiohttp>=3.8.0"],
