@@ -2,7 +2,7 @@
 
 from typing import Final
 
-DOMAIN: Final = "tauron_elicznik"
+DOMAIN: Final = "eltrue_tauron_ha"
 
 # URLs
 URL_LOGIN: Final = "https://logowanie.tauron-dystrybucja.pl/login"

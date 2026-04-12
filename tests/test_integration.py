@@ -137,10 +137,10 @@ def _load_with_stubs():
 
     # ── load integration modules ──────────────────────────────────────────────
 
-    pkg_path = os.path.join(ROOT, "custom_components", "tauron_elicznik")
+    pkg_path = os.path.join(ROOT, "custom_components", "eltrue_tauron_ha")
 
     def _load_pkg_module(filename, short):
-        full_name = f"custom_components.tauron_elicznik.{short}"
+        full_name = f"custom_components.eltrue_tauron_ha.{short}"
         spec = importlib.util.spec_from_file_location(
             full_name, os.path.join(pkg_path, filename)
         )
@@ -150,8 +150,8 @@ def _load_with_stubs():
         return mod
 
     sys.modules["custom_components"] = types.ModuleType("custom_components")
-    sys.modules["custom_components.tauron_elicznik"] = types.ModuleType(
-        "custom_components.tauron_elicznik"
+    sys.modules["custom_components.eltrue_tauron_ha"] = types.ModuleType(
+        "custom_components.eltrue_tauron_ha"
     )
 
     const_mod = _load_pkg_module("const.py", "const")
@@ -159,7 +159,7 @@ def _load_with_stubs():
     coord_mod = _load_pkg_module("coordinator.py", "coordinator")
 
     # sensor.py does `from . import TauronElicznikConfigEntry` — stub it on the pkg
-    pkg_mod = sys.modules["custom_components.tauron_elicznik"]
+    pkg_mod = sys.modules["custom_components.eltrue_tauron_ha"]
     pkg_mod.TauronElicznikConfigEntry = _Subscriptable  # type: ignore[attr-defined]
 
     sensor_mod = _load_pkg_module("sensor.py", "sensor")
@@ -173,7 +173,7 @@ _const, _api, _coord, _sensor = _load_with_stubs()
 # ── constants ─────────────────────────────────────────────────────────────────
 
 def test_domain():
-    assert _const.DOMAIN == "tauron_elicznik"
+    assert _const.DOMAIN == "eltrue_tauron_ha"
 
 
 def test_net_metering_ratio():

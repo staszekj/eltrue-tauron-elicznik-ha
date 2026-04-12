@@ -1,7 +1,7 @@
 # Tauron eLicznik - Home Assistant Integration
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
-[![GitHub Release](https://img.shields.io/github/release/staszekj/tauron-elicznik-ha.svg)](https://github.com/staszekj/tauron-elicznik-ha/releases)
+[![GitHub Release](https://img.shields.io/github/release/staszekj/eltrue-tauron-ha.svg)](https://github.com/staszekj/eltrue-tauron-ha/releases)
 
 Home Assistant integration for **Tauron eLicznik** - Polish energy meter readings from Tauron Dystrybucja.
 
@@ -21,7 +21,7 @@ Home Assistant integration for **Tauron eLicznik** - Polish energy meter reading
 
 1. Open HACS in Home Assistant
 2. Click the three dots menu → **Custom repositories**
-3. Add `https://github.com/staszekj/tauron-elicznik-ha` as **Integration**
+3. Add `https://github.com/staszekj/eltrue-tauron-ha` as **Integration**
 4. Search for "Tauron eLicznik" and install
 5. Restart Home Assistant
 6. Go to **Settings → Devices & Services → Add Integration → Tauron eLicznik**
@@ -29,7 +29,7 @@ Home Assistant integration for **Tauron eLicznik** - Polish energy meter reading
 ### Manual Installation
 
 1. Download the latest release
-2. Copy `custom_components/tauron_elicznik` to your `config/custom_components/` folder
+2. Copy `custom_components/eltrue_tauron_ha` to your `config/custom_components/` folder
 3. Restart Home Assistant
 4. Add the integration via UI
 
@@ -49,22 +49,22 @@ During setup, the integration automatically fetches your meter readings as of th
 
 | Sensor | Description | Unit | Device Class |
 |--------|-------------|------|--------------|
-| `sensor.tauron_elicznik_consumed_energy` | Total energy consumed (lifetime counter) | kWh | energy |
-| `sensor.tauron_elicznik_exported_energy` | Total energy exported (lifetime counter) | kWh | energy |
-| `sensor.tauron_elicznik_consumed_energy_at_billing_start` | Consumed energy at start of billing period | kWh | energy |
-| `sensor.tauron_elicznik_exported_energy_at_billing_start` | Exported energy at start of billing period | kWh | energy |
-| `sensor.tauron_elicznik_energy_balance` | Net-metering balance remaining | kWh | energy |
-| `sensor.tauron_elicznik_daily_energy_budget` | Required daily usage to zero balance | kWh | energy |
-| `sensor.tauron_elicznik_monthly_energy_budget` | Projected monthly usage needed | kWh | energy |
-| `sensor.tauron_elicznik_days_until_billing` | Days until billing period ends | days | — |
-| `sensor.tauron_elicznik_last_reading_date` | Timestamp of last meter reading from Tauron | — | timestamp |
-| `sensor.tauron_elicznik_last_data_fetch` | Timestamp of last successful API call | — | timestamp |
+| `sensor.eltrue_tauron_ha_consumed_energy` | Total energy consumed (lifetime counter) | kWh | energy |
+| `sensor.eltrue_tauron_ha_exported_energy` | Total energy exported (lifetime counter) | kWh | energy |
+| `sensor.eltrue_tauron_ha_consumed_energy_at_billing_start` | Consumed energy at start of billing period | kWh | energy |
+| `sensor.eltrue_tauron_ha_exported_energy_at_billing_start` | Exported energy at start of billing period | kWh | energy |
+| `sensor.eltrue_tauron_ha_energy_balance` | Net-metering balance remaining | kWh | energy |
+| `sensor.eltrue_tauron_ha_daily_energy_budget` | Required daily usage to zero balance | kWh | energy |
+| `sensor.eltrue_tauron_ha_monthly_energy_budget` | Projected monthly usage needed | kWh | energy |
+| `sensor.eltrue_tauron_ha_days_until_billing` | Days until billing period ends | days | — |
+| `sensor.eltrue_tauron_ha_last_reading_date` | Timestamp of last meter reading from Tauron | — | timestamp |
+| `sensor.eltrue_tauron_ha_last_data_fetch` | Timestamp of last successful API call | — | timestamp |
 
 ## Button
 
 | Button | Description |
 |--------|-------------|
-| `button.tauron_elicznik_refresh_data` | Manually trigger data refresh from Tauron API |
+| `button.eltrue_tauron_ha_refresh_data` | Manually trigger data refresh from Tauron API |
 
 ## Polling Interval
 

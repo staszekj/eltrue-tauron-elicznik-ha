@@ -1,10 +1,10 @@
 {
-  "domain": "tauron_elicznik",
+  "domain": "eltrue_tauron_ha",
   "name": "Tauron eLicznik",
   "codeowners": ["@staszekj"],
   "config_flow": true,
-  "documentation": "https://github.com/staszekj/tauron-elicznik-ha",
-  "issue_tracker": "https://github.com/staszekj/tauron-elicznik-ha/issues",
+  "documentation": "https://github.com/staszekj/eltrue-tauron-ha",
+  "issue_tracker": "https://github.com/staszekj/eltrue-tauron-ha/issues",
   "integration_type": "service",
   "iot_class": "cloud_polling",
   "requirements": ["aiohttp>=3.8.0"],
