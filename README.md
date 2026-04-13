@@ -3,7 +3,19 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub Release](https://img.shields.io/github/release/staszekj/eltrue-tauron-elicznik-ha.svg)](https://github.com/staszekj/eltrue-tauron-elicznik-ha/releases)
 
-Home Assistant integration for **Tauron eLicznik** - Polish energy meter readings from Tauron Dystrybucja.
+![Tauron](tauron_logo.webp)
+
+Home Assistant integration for **Tauron eLicznik** — Polish energy meter readings from Tauron Dystrybucja.
+
+> **⚠️ Uwaga: integracja dotyczy systemu net-meteringu (rozliczenie ilościowe)**
+>
+> Ta integracja jest przeznaczona wyłącznie dla prosumentów rozliczanych w **starszym systemie net-meteringu** (obowiązującym do 31.03.2022), w którym:
+>
+> - prosument może odebrać **80%** energii oddanej do sieci (współczynnik 0,8 dla instalacji ≤10 kWp lub 0,7 dla >10 kWp — w tej integracji przyjęto 0,8),
+> - **okres rozliczeniowy wynosi 1 rok** (12 miesięcy od daty wskazanej przy konfiguracji),
+> - nadwyżka energii niewykorzystana w okresie rozliczeniowym przepada.
+>
+> **Nowy system net-billingu** (rozliczenie wartościowe, obowiązujący od 01.04.2022 dla nowych prosumentów) **nie jest obsługiwany** przez tę integrację.
 
 ## Features
 
@@ -77,7 +89,12 @@ You can manually trigger a refresh anytime:
 
 ## Net-Metering Calculation
 
-In Poland, prosumers can use 80% of the energy they export to the grid. This integration calculates:
+> **Dotyczy wyłącznie systemu net-meteringu** (rozliczenia ilościowego, umowy zawarte przed 01.04.2022).
+> Nowy system net-billingu (rozliczenie wartościowe) nie jest obsługiwany.
+
+In Poland, prosumers under the **net-metering** scheme can use **80%** of the energy they export to the grid. The billing period is **1 year** (12 months). Any surplus not consumed within the billing period is lost.
+
+This integration calculates:
 
 ```
 kWh_left = (energia_oddana_increment × 0.8) - energia_pobrana_increment
