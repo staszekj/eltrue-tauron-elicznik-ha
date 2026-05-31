@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 import logging
+import re
 from typing import Any
 
 from aiohttp import ClientSession
@@ -48,89 +49,70 @@ class TauronApiClient:
         self._cookies: dict[str, str] = {}
 
     async def authenticate(self) -> bool:
-        """Login to Tauron eLicznik and obtain session cookies."""
-        _LOGGER.debug("Authenticating with Tauron eLicznik")
+        """Login to Tauron eLicznik via Keycloak CAS and obtain session cookies."""
+        _LOGGER.debug("Authenticating with Tauron eLicznik (Keycloak)")
 
-        # GET login page first to obtain PHPSESSID session cookie
+        # Step 1: GET login page with service param, follow redirects to Keycloak form
+        login_url = f"{URL_LOGIN}?service={URL_SERVICE}"
         try:
-            async with self._session.get(URL_LOGIN, allow_redirects=True):
-                pass
+            async with self._session.get(login_url, allow_redirects=True) as resp:
+                html = await resp.text()
         except Exception as err:
             raise TauronApiError(f"Failed to reach login page: {err}") from err
 
+        # Step 2: Extract Keycloak form action URL
+        match = re.search(r'action="([^"]+)"', html)
+        if not match:
+            raise TauronAuthError("Could not find login form action URL")
+        action_url = match.group(1).replace("&amp;", "&")
+        _LOGGER.debug("Keycloak action URL: %s", action_url)
+
+        # Step 3: POST credentials to Keycloak action URL
         login_data = {
             "username": self._username,
             "password": self._password,
-            "service": URL_SERVICE,
+            "credentialId": "",
         }
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
-        redirect_url = await self._login_step(login_data, headers)
-        await self._get_session_cookies(redirect_url)
-
-        _LOGGER.debug("Successfully authenticated with Tauron eLicznik")
-        return True
-
-    async def _login_step(
-        self, login_data: dict[str, str], headers: dict[str, str]
-    ) -> str:
-        """Perform login POST and return redirect URL."""
         try:
             async with self._session.post(
-                URL_LOGIN,
+                action_url,
                 data=login_data,
                 headers=headers,
                 allow_redirects=False,
-            ) as response:
-                if response.status not in (302, 303):
+            ) as resp:
+                if resp.status not in (302, 303):
                     raise TauronAuthError(  # noqa: TRY301
-                        "Login failed - no redirect received"
+                        f"Login failed - unexpected status {resp.status}"
                     )
-
-                redirect_url = response.headers.get("Location")
-                if not redirect_url:
-                    raise TauronAuthError(  # noqa: TRY301
-                        "Login failed - no redirect URL"
-                    )
-
-                # If redirect goes back to /login, authentication failed
-                if redirect_url == "/login" or redirect_url.endswith("/login"):
-                    raise TauronAuthError(  # noqa: TRY301
-                        "Invalid username or password"
-                    )
-
-                return redirect_url
+                redirect_url = resp.headers.get("Location", "")
         except TauronAuthError:
             raise
         except Exception as err:
-            _LOGGER.exception("Authentication error")
-            raise TauronApiError(f"Authentication failed: {err}") from err
+            raise TauronApiError(f"Authentication POST failed: {err}") from err
 
-    async def _get_session_cookies(self, redirect_url: str) -> None:
-        """Follow redirect and store session cookies."""
-        # Handle relative URLs by making them absolute
+        # Keycloak redirects back to /login?ticket=... if credentials are wrong
+        if not redirect_url or "login" in redirect_url and "ticket" not in redirect_url:
+            raise TauronAuthError("Invalid username or password")
+
+        # Step 4: Follow redirect(s) to elicznik service to get session cookies
         if redirect_url.startswith("/"):
             redirect_url = f"https://logowanie.tauron-dystrybucja.pl{redirect_url}"
 
         try:
-            async with self._session.get(
-                redirect_url,
-                allow_redirects=True,
-            ):
-                # Store cookies from response
+            async with self._session.get(redirect_url, allow_redirects=True):
                 self._cookies = {
                     cookie.key: cookie.value for cookie in self._session.cookie_jar
                 }
-
-                if not self._cookies:
-                    raise TauronAuthError(  # noqa: TRY301
-                        "No session cookies received"
-                    )
-        except TauronAuthError:
-            raise
         except Exception as err:
-            _LOGGER.exception("Authentication error")
-            raise TauronApiError(f"Authentication failed: {err}") from err
+            raise TauronApiError(f"Failed to follow post-login redirect: {err}") from err
+
+        if not self._cookies:
+            raise TauronAuthError("No session cookies received after login")
+
+        _LOGGER.debug("Successfully authenticated with Tauron eLicznik")
+        return True
 
     async def fetch_energy_data(
         self, query_date: date | None = None
