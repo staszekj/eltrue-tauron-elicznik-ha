@@ -197,7 +197,7 @@ def test_url_api():
 # ── sensor descriptions ───────────────────────────────────────────────────────
 
 def test_sensor_descriptions_count():
-    assert len(_sensor.SENSOR_DESCRIPTIONS) == 10
+    assert len(_sensor.SENSOR_DESCRIPTIONS) == 23
 
 
 def test_sensor_keys_present():
@@ -213,6 +213,19 @@ def test_sensor_keys_present():
         "energia_pobrana_start",
         "energia_oddana_start",
         "last_fetch_time",
+        "energia_pobrana_dzien",
+        "t1",
+        "t2",
+        "t3",
+        "t1_dzisiaj",
+        "t2_dzisiaj",
+        "t3_dzisiaj",
+        "energia_oddana_dzien",
+        "srednia_pobrana_dzien",
+        "srednia_oddana_dzien",
+        "tariff",
+        "pse_today",
+        "pse_tomorrow",
     }
 
 
@@ -238,6 +251,39 @@ def test_timestamp_sensors_have_device_class():
             )
 
 
+def test_parse_chart_energy_values_and_average():
+    """Chart API totals are the sum of the returned values[] array."""
+    data = {
+        "success": True,
+        "data": {"values": [1.2, 2.3, 7.1], "average": 0.4},
+    }
+    total, average = _api.TauronApiClient._parse_chart_energy(data)
+    assert total == 10.6
+    assert average == 0.4
+
+
+def test_parse_chart_energy_ignores_missing_values():
+    """Null chart points do not contribute to the daily total."""
+    data = {
+        "success": True,
+        "data": {"values": [None, 1.5, None, 2.0], "average": None},
+    }
+    total, average = _api.TauronApiClient._parse_chart_energy(data)
+    assert total == 3.5
+    assert average is None
+
+
+def test_parse_chart_energy_rejects_empty_values():
+    """An empty values array is treated as unavailable chart data."""
+    try:
+        _api.TauronApiClient._parse_chart_energy(
+            {"success": True, "data": {"values": []}}
+        )
+    except _api.TauronApiError:
+        return
+    raise AssertionError("Expected TauronApiError")
+
+
 # ── TauronCalculatedData computation ──────────────────────────────────────────
 
 def _make_fake_coord(billing_end: date, prev_pobrana: float, prev_oddana: float):
@@ -257,6 +303,14 @@ def _energy_data(pobrana: float, oddana: float, reading_dt: datetime | None = No
         energia_pobrana=pobrana,
         energia_oddana=oddana,
         reading_date=reading_dt or datetime(2026, 1, 9, 23, 59, 59),
+        energia_pobrana_dzisiaj=None,
+        energia_oddana_dzisiaj=None,
+        t1=None,
+        t2=None,
+        t3=None,
+        t1_dzisiaj=None,
+        t2_dzisiaj=None,
+        t3_dzisiaj=None,
         success=True,
     )
 
@@ -395,6 +449,14 @@ def test_tauron_energy_data_dataclass():
         energia_pobrana=28969.0,
         energia_oddana=15000.0,
         reading_date=reading,
+        energia_pobrana_dzisiaj=None,
+        energia_oddana_dzisiaj=None,
+        t1=None,
+        t2=None,
+        t3=None,
+        t1_dzisiaj=None,
+        t2_dzisiaj=None,
+        t3_dzisiaj=None,
         success=True,
     )
     assert data.energia_pobrana == 28969.0

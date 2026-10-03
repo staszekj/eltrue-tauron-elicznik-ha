@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -18,6 +18,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
 from . import TauronElicznikConfigEntry
 from .const import DOMAIN
@@ -32,6 +33,24 @@ class TauronSensorEntityDescription(SensorEntityDescription):
 
     value_fn: Callable[[TauronCalculatedData], Any]
 
+
+def _pse_current_state(
+    values: list[dict[str, Any]], target_date: date
+) -> str | None:
+    """Return the PSE recommendation for the current hour on target_date."""
+    if not values:
+        return None
+
+    current_hour = dt_util.now().hour
+    prefix = f"{target_date.isoformat()} {current_hour:02d}:"
+
+    for item in values:
+        dtime = str(item.get("dtime", ""))
+        if dtime.startswith(prefix):
+            state = item.get("state")
+            return str(state) if state is not None else None
+
+    return None
 
 SENSOR_DESCRIPTIONS: tuple[TauronSensorEntityDescription, ...] = (
     TauronSensorEntityDescription(
@@ -106,6 +125,91 @@ SENSOR_DESCRIPTIONS: tuple[TauronSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.TIMESTAMP,
         value_fn=lambda data: data.last_fetch_time,
     ),
+    TauronSensorEntityDescription(
+        key="energia_pobrana_dzien",
+        translation_key="energia_pobrana_dzien",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.energia_pobrana_dzien,
+    ),
+    TauronSensorEntityDescription(
+        key="t1",
+        translation_key="t1",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=lambda data: data.t1,
+    ),
+    TauronSensorEntityDescription(
+        key="t2",
+        translation_key="t2",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=lambda data: data.t2,
+    ),
+    TauronSensorEntityDescription(
+        key="t3",
+        translation_key="t3",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=lambda data: data.t3,
+    ),
+    TauronSensorEntityDescription(
+        key="t1_dzisiaj",
+        translation_key="t1_dzisiaj",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.t1_dzisiaj,
+    ),
+    TauronSensorEntityDescription(
+        key="t2_dzisiaj",
+        translation_key="t2_dzisiaj",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.t2_dzisiaj,
+    ),
+    TauronSensorEntityDescription(
+        key="t3_dzisiaj",
+        translation_key="t3_dzisiaj",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.t3_dzisiaj,
+    ),
+    TauronSensorEntityDescription(
+        key="energia_oddana_dzien",
+        translation_key="energia_oddana_dzien",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.energia_oddana_dzien,
+    ),
+    TauronSensorEntityDescription(
+        key="srednia_pobrana_dzien",
+        translation_key="srednia_pobrana_dzien",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.srednia_pobrana_dzien,
+    ),
+    TauronSensorEntityDescription(
+        key="srednia_oddana_dzien",
+        translation_key="srednia_oddana_dzien",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.srednia_oddana_dzien,
+    ),
+    TauronSensorEntityDescription(
+        key="tariff",
+        translation_key="tariff",
+        value_fn=lambda data: data.tariff,
+    ),
+    TauronSensorEntityDescription(
+        key="pse_today",
+        translation_key="pse_today",
+        value_fn=lambda data: _pse_current_state(data.pse_today, dt_util.now().date()),
+    ),
+    TauronSensorEntityDescription(
+        key="pse_tomorrow",
+        translation_key="pse_tomorrow",
+        value_fn=lambda data: _pse_current_state(data.pse_tomorrow, dt_util.now().date() + timedelta(days=1)),
+    ),
 )
 
 
@@ -148,7 +252,39 @@ class TauronSensor(CoordinatorEntity[TauronElicznikCoordinator], SensorEntity):
         )
 
     @property
-    def native_value(self) -> float | int | date | datetime | None:
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return additional chart, tariff and PSE details."""
+        if self.coordinator.data is None:
+            return None
+
+        key = self.entity_description.key
+
+        if key == "energia_pobrana_dzien":
+            return {
+                "chart_history": self.coordinator.data.chart_history,
+                "chart_days": len(self.coordinator.data.chart_history),
+                "chart_source": "TAURON /odczyty/api (today) + /energia/api (history)",
+            }
+
+        if key == "tariff":
+            return {"source": "TAURON /energia/api"}
+
+        if key in {"pse_today", "pse_tomorrow"}:
+            values = (
+                self.coordinator.data.pse_today
+                if key == "pse_today"
+                else self.coordinator.data.pse_tomorrow
+            )
+            return {
+                "source": "PSE Energetyczny Kompas /api/pdgsz",
+                "hours": values,
+                "hours_count": len(values),
+            }
+
+        return None
+
+    @property
+    def native_value(self) -> Any:
         """Return the state of the sensor."""
         if self.coordinator.data is None:
             return None

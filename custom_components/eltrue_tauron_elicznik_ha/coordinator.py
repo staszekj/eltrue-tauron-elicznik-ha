@@ -12,7 +12,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .api import TauronApiClient, TauronApiError, TauronEnergyData
+from .api import TauronApiClient, TauronApiError, TauronEnergyData, TauronPeriodEnergyData
 from .const import (
     CONF_BILLING_PERIOD_START,
     CONF_PREV_ENERGIA_ODDANA,
@@ -32,27 +32,38 @@ _LOGGER = logging.getLogger(__name__)
 class TauronCalculatedData:
     """Calculated data from Tauron readings."""
 
-    # Raw meter readings
     energia_pobrana: float
     energia_oddana: float
     reading_date: datetime
 
-    # Billing period start readings (reference values fetched at setup)
     energia_pobrana_start: float
     energia_oddana_start: float
 
-    # Timestamp of last successful data fetch from eLicznik
     last_fetch_time: datetime
 
-    # Increments since billing period start
     energia_pobrana_increment: float
     energia_oddana_increment: float
 
-    # Net-metering calculations
     kwh_left: float
     days_left: int
     kwh_left_per_day: float
     kwh_left_per_month: float
+
+    # Values from the official eLicznik chart endpoint.
+    energia_pobrana_dzien: float | None
+    energia_oddana_dzien: float | None
+    srednia_pobrana_dzien: float | None
+    srednia_oddana_dzien: float | None
+    t1: float | None
+    t2: float | None
+    t3: float | None
+    t1_dzisiaj: float | None
+    t2_dzisiaj: float | None
+    t3_dzisiaj: float | None
+    chart_history: list[dict[str, object]]
+    tariff: str | None
+    pse_today: list[dict[str, object]]
+    pse_tomorrow: list[dict[str, object]]
 
 
 class TauronElicznikCoordinator(DataUpdateCoordinator[TauronCalculatedData]):
@@ -60,11 +71,7 @@ class TauronElicznikCoordinator(DataUpdateCoordinator[TauronCalculatedData]):
 
     config_entry: ConfigEntry
 
-    def __init__(
-        self,
-        hass: HomeAssistant,
-        config_entry: ConfigEntry,
-    ) -> None:
+    def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
         """Initialize the coordinator."""
         super().__init__(
             hass,
@@ -81,7 +88,6 @@ class TauronElicznikCoordinator(DataUpdateCoordinator[TauronCalculatedData]):
             password=config_entry.data["password"],
         )
 
-        # Billing period configuration: calculate end from start (1 year - 1 day)
         billing_start = datetime.strptime(
             config_entry.data[CONF_BILLING_PERIOD_START], "%Y-%m-%d"
         ).date()
@@ -89,42 +95,111 @@ class TauronElicznikCoordinator(DataUpdateCoordinator[TauronCalculatedData]):
             date(billing_start.year + 1, billing_start.month, billing_start.day)
             - timedelta(days=1)
         )
-        self._prev_energia_pobrana = float(config_entry.data[CONF_PREV_ENERGIA_POBRANA])
-        self._prev_energia_oddana = float(config_entry.data[CONF_PREV_ENERGIA_ODDANA])
+        self._prev_energia_pobrana = float(
+            config_entry.data[CONF_PREV_ENERGIA_POBRANA]
+        )
+        self._prev_energia_oddana = float(
+            config_entry.data[CONF_PREV_ENERGIA_ODDANA]
+        )
 
     async def _async_update_data(self) -> TauronCalculatedData:
         """Fetch data from Tauron API and calculate net-metering values."""
         fetch_time = dt_util.now()
+        period_data: TauronPeriodEnergyData | None = None
+        pse_today: list[dict[str, object]] = []
+        pse_tomorrow: list[dict[str, object]] = []
+
         try:
             await self._client.authenticate()
             energy_data = await self._client.fetch_energy_data()
+
+            # Keep the existing lifetime-counter path authoritative. The new
+            # chart endpoint is intentionally isolated so a /blokada or a
+            # changed chart response cannot take down the existing sensors.
+            try:
+                period_data = await self._client.fetch_period_energy_data()
+            except TauronApiError as err:
+                _LOGGER.warning(
+                    "Tauron chart API unavailable; keeping period sensors unavailable: %s",
+                    err,
+                )
+
+            try:
+                pse_today = await self._client.fetch_pse_peak_hours(dt_util.now().date())
+                pse_tomorrow = await self._client.fetch_pse_peak_hours(
+                    dt_util.now().date() + timedelta(days=1)
+                )
+                _LOGGER.warning(
+                    "PSE Energetyczny Kompas: pobrano dzisiaj=%d, jutro=%d rekordow",
+                    len(pse_today),
+                    len(pse_tomorrow),
+                )
+            except Exception as err:
+                _LOGGER.warning(
+                    "PSE Energetyczny Kompas unavailable: %s: %s",
+                    type(err).__name__,
+                    err,
+                    exc_info=True,
+                )
         except TauronApiError as err:
             raise UpdateFailed(f"Error fetching Tauron data: {err}") from err
         finally:
             await self._client.logout()
 
-        return self._calculate_data(energy_data, fetch_time)
+        return self._calculate_data(
+            energy_data,
+            fetch_time,
+            period_data,
+            pse_today=pse_today,
+            pse_tomorrow=pse_tomorrow,
+        )
 
-    def _calculate_data(self, energy_data: TauronEnergyData, fetch_time: datetime) -> TauronCalculatedData:
+    def _calculate_data(
+        self,
+        energy_data: TauronEnergyData,
+        fetch_time: datetime,
+        period_data: TauronPeriodEnergyData | None = None,
+        pse_today: list[dict[str, object]] | None = None,
+        pse_tomorrow: list[dict[str, object]] | None = None,
+    ) -> TauronCalculatedData:
         """Calculate net-metering values from raw energy data."""
-        # Calculate increments since billing period start
+        pse_today = pse_today or []
+        pse_tomorrow = pse_tomorrow or []
+
         en_pob_increment = energy_data.energia_pobrana - self._prev_energia_pobrana
         en_odd_increment = energy_data.energia_oddana - self._prev_energia_oddana
-
-        # Apply 80% net-metering ratio
         en_odd_increment_80 = NET_METERING_RATIO * en_odd_increment
-
-        # Calculate remaining energy balance
         kwh_left = en_odd_increment_80 - en_pob_increment
 
-        # Calculate days left until billing period end
         today = date.today()
         days_left = (self._billing_period_end - today).days
-        days_left = max(days_left, 1)  # Avoid division by zero
+        days_left = max(days_left, 1)
 
-        # Calculate daily and monthly budgets
         kwh_left_per_day = kwh_left / days_left
         kwh_left_per_month = 30 * kwh_left_per_day
+
+        chart_history = list(period_data.chart_history if period_data else [])
+        today_iso = dt_util.now().date().isoformat()
+
+        # The chart API may lag behind the current meter reading. For today,
+        # prefer the cumulative meter readings from /odczyty/api.
+        if energy_data.energia_pobrana_dzisiaj is not None:
+            existing_today = next(
+                (entry for entry in chart_history if entry.get("date") == today_iso),
+                None,
+            )
+            today_entry = {
+                **(existing_today or {}),
+                "date": today_iso,
+                "total": round(energy_data.energia_pobrana_dzisiaj, 3),
+                "source": "odczyty/api",
+            }
+            chart_history = [
+                entry for entry in chart_history
+                if entry.get("date") != today_iso
+            ]
+            chart_history.append(today_entry)
+        chart_history.sort(key=lambda entry: str(entry.get("date", "")))
 
         return TauronCalculatedData(
             energia_pobrana=energy_data.energia_pobrana,
@@ -139,4 +214,28 @@ class TauronElicznikCoordinator(DataUpdateCoordinator[TauronCalculatedData]):
             days_left=days_left,
             kwh_left_per_day=round(kwh_left_per_day, 2),
             kwh_left_per_month=round(kwh_left_per_month, 2),
+            energia_pobrana_dzien=(
+                energy_data.energia_pobrana_dzisiaj
+                if energy_data.energia_pobrana_dzisiaj is not None
+                else (period_data.energia_pobrana if period_data else None)
+            ),
+            energia_oddana_dzien=(
+                period_data.energia_oddana if period_data else None
+            ),
+            srednia_pobrana_dzien=(
+                period_data.srednia_pobrana if period_data else None
+            ),
+            srednia_oddana_dzien=(
+                period_data.srednia_oddana if period_data else None
+            ),
+            t1=energy_data.t1,
+            t2=energy_data.t2,
+            t3=energy_data.t3,
+            t1_dzisiaj=energy_data.t1_dzisiaj,
+            t2_dzisiaj=energy_data.t2_dzisiaj,
+            t3_dzisiaj=energy_data.t3_dzisiaj,
+            chart_history=chart_history,
+            tariff=period_data.tariff if period_data else None,
+            pse_today=pse_today,
+            pse_tomorrow=pse_tomorrow,
         )
